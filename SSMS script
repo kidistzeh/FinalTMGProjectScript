@@ -1,0 +1,437 @@
+                -- Auter Kidist Zerihun 
+
+
+USE TMG
+GO
+---adding date to the table [dbo].[Borrower_details]
+DECLARE @StartDate AS date;
+DECLARE @EndDate AS date;
+
+SELECT @StartDate = '2019-01-01'
+SELECT @EndDate = '2019-12-31'
+
+UPDATE [dbo].[Borrower_details]
+SET [ApplDate]  = DATEADD (DAY, RAND(CHECKSUM(NEWID()))*(1+ DATEDIFF(DAY, @StartDate, @EndDate)),@StartDate)
+
+ select * from [dbo].[Borrower_details]
+
+ -- Please use the update statement to add a date in the last one year (2019) for the loanDate. 
+-- Make sure that the dates are some in the last one week, some in the last one month and rest in one year period
+
+--LOAN CASES IN THE LAST ONE WEEK
+DECLARE @StartDate AS date;
+DECLARE @EndDate AS date;
+
+SELECT @StartDate = '2019-12-24'
+SELECT @EndDate = '2019-12-31'
+
+UPDATE [dbo].[Loan_details]
+SET [LoanDate]  = DATEADD (DAY, RAND(CHECKSUM(NEWID()))*(1+ DATEDIFF(DAY, @StartDate, @EndDate)),@StartDate)
+ WHERE [Loan_ID] BETWEEN 47 AND 51
+
+ --LOAN CASES IN THE LAST ONE MONTH
+
+SELECT @StartDate = '2019-12-01'
+SELECT @EndDate = '2019-12-31'
+
+UPDATE [dbo].[Loan_details]
+SET [LoanDate]  = DATEADD (DAY, RAND(CHECKSUM(NEWID()))*(1+ DATEDIFF(DAY, @StartDate, @EndDate)),@StartDate)
+ WHERE [Loan_ID] BETWEEN 41 AND 46
+
+ --LOAN CASES IN LAST YEAR
+SELECT @StartDate = '2019-01-01'
+SELECT @EndDate = '2019-12-31'
+
+UPDATE [dbo].[Loan_details]
+SET [LoanDate]  = DATEADD (DAY, RAND(CHECKSUM(NEWID()))*(1+ DATEDIFF(DAY, @StartDate, @EndDate)),@StartDate)
+ WHERE [Loan_ID] BETWEEN 30 AND 40
+  
+  select * from [dbo].[Loan_details]
+
+   --then join all the tables
+  SELECT * FROM [dbo].[Borrower_details]
+  SELECT * FROM [dbo].[Financial_details]
+  SELECT * FROM [dbo].[Loan_details]
+  SELECT * FROM [dbo].[Property_details]
+
+  
+CREATE VIEW VW_TMGDB
+AS
+(SELECT BD.SSN, LD.Loan_ID, PD.Property_ID, BD.[Borrower FirstName], BD.[Borrower LastName], BD.[Borrower Email], BD.[Home Phone],
+BD.[Cell Phone], BD.[Marital Status], BD.[Date of Birth], BD.[Current Street Address], 
+BD.City, BD.[State], BD. Zip, BD.YearsAtThisAddress, BD.Sex, BD.Ethnicity, BD. Race, BD. [Co-Borrower FirstName],
+BD.[Co-Borrower LastName],BD.[Co-Borrower SSN], BD.ApplDate, FD.MonthlyIncome, FD.Bonuses, FD.Commission,
+FD.OtherIncome, FD.[Rent or Own], FD.Checking, FD.Savings, FD.RetirementFund, FD.MutualFund,
+LD.[Purpose of Loan], LD.LoanAmount, LD.[Purchase Price], LD.CreditCardAuthorization,
+LD.[Number of Units], LD.Refferal, LD.LoanDate, PD.[Property Usage], PD.[Property City], PD.[Property State],
+PD.[Property Zip], PD.RealEstateAgentName, PD.RealEstateAgentPhone, PD.RealEstateAgentEmail FROM Borrower_details BD
+JOIN Financial_details FD
+ON BD.SSN = FD.SSN
+JOIN Loan_details LD
+ON BD.[Co-Borrower SSN] = LD.[Co-Borrower SSN]
+JOIN Property_details PD
+ON LD.Property_ID = PD.Property_ID 
+)
+SELECT * FROM VW_TMGDB
+
+-- From the project "For this exercise, let’s assume that all loans requested are approved "
+-- so all datas will be inserted into validated table. 
+
+USE Staging
+GO
+
+
+
+INSERT INTO [dbo].[validated table] 
+SELECT * FROM [dbo].[Staging]
+
+SELECT * FROM [validated table]
+
+SELECT * FROM  [dbo].[Staging]
+
+SELECT * FROM [dbo].[Sent to loan officer table]
+
+
+TRUNCATE TABLE [dbo].[Mortgage Applicant]
+GO
+
+/*There are columns that have invalid datas But according to the appendix 
+take it as error only if there is an error in the rows on the required columns.
+those required columns are [SSN],[Home Phone], [Zip]
+it is fine to pass [Cell Phone],[RealEstateAgentPhone] columns since they are not required.*/
+
+
+SELECT * FROM [dbo].[validated table]
+
+select LEN ([SSN]) FROM [dbo].[validated table]
+
+ALTER TABLE [dbo].[validated table]
+ADD SSNLength VARCHAR(50) NULL;
+
+UPDATE [dbo].[validated table]
+SET SSNLength =  LEN ([SSN])
+
+UPDATE [dbo].[validated table]
+SET [Home Phone] = REPLACE (REPLACE (REPLACE (REPLACE([Home Phone], '(',''),')', ''),'-',''),' ','') 
+
+ALTER TABLE [dbo].[validated table]
+ADD Home_Phone_Length VARCHAR(50) NULL;
+
+UPDATE [dbo].[validated table]
+SET Home_Phone_Length = LEN ([Home Phone])
+
+ALTER TABLE [dbo].[validated table]
+ADD Zip_Length VARCHAR (50) NULL;
+
+UPDATE [dbo].[validated table]
+SET Zip_Length = LEN ([Zip])
+
+UPDATE [Sent to loan officer table]
+SET Problem = 'invalid_SSN'
+WHERE LEN (SSN) != 9
+
+
+USE TMG_ODS
+GO
+
+SELECT * FROM [Mortgage Applicant]
+
+
+USE [Staging]
+GO
+
+
+  
+INSERT INTO [dbo].[Dim_Borrower]
+SELECT DISTINCT [Borrower FirstName], [Borrower LastName], [Borrower Email],
+    10000 +  ABS(CHECKSUM(NEWID())) %100000 as  [SSN],
+    [Home Phone], [Cell Phone], [Marital Status], [Date of Birth], [Current Street Address],
+	[City], [State], [Zip], [YearsAtThisAddress], [MonthlyIncome], [Bonuses] ,
+	[Commission], [OtherIncome], [Rent or Own], [Sex], [Ethnicity], [Race] ,
+	[Co-Borrower FirstName], [Co-Borrower LasttName], [Co-Borrower Email], [CreditCardAuthorization] ,
+	[Checking], [Savings], [RetirementFund], [MutualFund], [Referral], [ApplDate]  FROM [dbo].[validated table]
+
+
+
+	
+
+INSERT INTO [dbo].[Dim_Property]
+SELECT DISTINCT [Property Usage], [Property City], [Property State] ,
+	[Property Zip], [RealEstateAgentName], [RealEstateAgentPhone],
+	[RealEstateAgentEmail]  FROM [dbo].[validated table]
+
+SELECT * FROM [dbo].[Dim_Property]
+
+TRUNCATE TABLE [dbo].[Fact_Loan]
+GO
+ 
+/*PLEASE USE THE STAGING TABLE TO FIND THE OLAP DATBASE(Target OLAP / 
+Data warehouse, DIM TABLES)
+
+*/
+
+USE TMG_ODS
+GO
+
+CREATE VIEW VW_LOAN_TO_DATE
+AS(
+
+SELECT [LoanAmount], [LoanDate],
+ SUM([LoanAmount]) OVER (PARTITION BY [LoanAmount], DATEPART(WEEK,  [LoanDate]) ORDER BY [LoanDate]) [WTD],
+ SUM([LoanAmount]) OVER (PARTITION BY [LoanAmount], DATEPART(MONTH, [LoanDate]) ORDER BY [LoanDate]) [MTD],
+ SUM([LoanAmount]) OVER (PARTITION BY [LoanAmount], DATEPART(YEAR,  [LoanDate]) ORDER BY [LoanDate]) [YTD]
+
+FROM [dbo].[Mortgage Applicant]
+GROUP BY [LoanAmount], [LoanDate])
+
+CREATE VIEW VW_Loan_TO_Date_by_Purpose_Loan
+AS (
+SELECT [Purpose of Loan], [LoanAmount], [LoanDate],  
+ SUM([LoanAmount]) OVER (PARTITION BY [Purpose of Loan] , DATEPART(WEEK,  [LoanDate]) ORDER BY [LoanDate]) [WTD],
+ SUM([LoanAmount]) OVER (PARTITION BY [Purpose of Loan], DATEPART(MONTH, [LoanDate]) ORDER BY [LoanDate]) [MTD],
+ SUM([LoanAmount]) OVER (PARTITION BY [Purpose of Loan], DATEPART(YEAR,  [LoanDate]) ORDER BY [LoanDate]) [YTD]
+
+FROM [dbo].[Mortgage Applicant]
+)
+
+SELECT * FROM [dbo].[VW_Loan_to_Date_By_Loan_Amount]
+
+  SELECT COUNT(*)[Loan_Cnt], SUM ([WTD]) [WTD],  SUM ([MTD])[MTD], SUM ([YTD])[YTD], SUM([LoanAmount]),
+  (CASE WHEN ([LoanAmount]) < 100000 THEN 'Less Than $100K' 
+  WHEN ([LoanAmount]) BETWEEN 100000 AND 200000 THEN '$100K To 200K'
+  ELSE 'More Than $200K' END)[Purpose_Loan]
+  
+  FROM [dbo].[VW_Loan_to_Date_By_Loan_Amount]
+
+ GROUP BY CASE WHEN [LoanAmount] < 100000 THEN 'Less Than $100K'
+  WHEN [LoanAmount] BETWEEN 100000 AND 200000 THEN '$100K To 200K'
+  ELSE 'More Than $200K' END 
+  
+ CREATE VIEW VW_LoansToDate_By_PropertyUsage
+  AS (
+  SELECT [Property Usage], [LoanAmount], [LoanDate],  
+ SUM([LoanAmount]) OVER (PARTITION BY [Property Usage], DATEPART(WEEK,  [LoanDate]) ORDER BY [LoanDate]) [WTD],
+ SUM([LoanAmount]) OVER (PARTITION BY [Property Usage], DATEPART(MONTH, [LoanDate]) ORDER BY [LoanDate]) [MTD],
+ SUM([LoanAmount]) OVER (PARTITION BY [Property Usage], DATEPART(YEAR,  [LoanDate]) ORDER BY [LoanDate]) [YTD]
+
+FROM [dbo].[Mortgage Applicant]
+)
+
+--Loans to date by Marital  status 
+ SELECT COUNT (*)[Loan_Cnt], [Marital Status],  
+
+
+ COUNT([Marital Status]) OVER (PARTITION BY [Marital Status] , DATEPART(WEEK,  [LoanDate]) ORDER BY [LoanDate]) [WTD],
+ COUNT([Marital Status]) OVER (PARTITION BY [Marital Status], DATEPART(MONTH, [LoanDate]) ORDER BY [LoanDate]) [MTD],
+ COUNT([Marital Status]) OVER (PARTITION BY [Marital Status], DATEPART(YEAR,  [LoanDate]) ORDER BY [LoanDate]) [YTD]
+
+FROM [dbo].[Mortgage Applicant]
+GROUP BY [Marital Status], LoanDate
+
+
+
+ALTER TABLE [dbo].[Mortgage Applicant]
+ADD AGE INT 
+
+UPDATE  [dbo].[Mortgage Applicant]
+SET [AGE] = DATEDIFF (YEAR, [Date of Birth], GETDATE())
+
+ SELECT * FROM [dbo].[Mortgage Applicant]
+
+ 
+ --LOANS TO DATE BY AGE GROUP
+ SELECT COUNT (*)[Loan_Cnt],  
+
+ COUNT([AGE]) OVER (PARTITION BY [AGE] , DATEPART(WEEK,  [LoanDate]) ORDER BY [LoanDate]) [WTD],
+ COUNT([AGE]) OVER (PARTITION BY [AGE], DATEPART(MONTH, [LoanDate]) ORDER BY [LoanDate]) [MTD],
+ COUNT([AGE]) OVER (PARTITION BY [AGE], DATEPART(YEAR,  [LoanDate]) ORDER BY [LoanDate]) [YTD],
+
+ (CASE WHEN ([AGE]) <= 25 THEN '<=25' 
+  WHEN ([AGE]) BETWEEN 26 AND 35 THEN '26-35'
+  WHEN ([AGE]) BETWEEN 36 AND 45 THEN '36-45'
+  ELSE '46+' END)[AGE_Range]
+  
+
+FROM [dbo].[Mortgage Applicant]
+GROUP BY AGE, [LoanDate]
+
+ --
+ --Loans to date by race
+ SELECT COUNT (*)[Loan_Cnt],  [Race], 
+ COUNT([Race]) OVER (PARTITION BY [Race] , DATEPART(WEEK,  [LoanDate]) ORDER BY [LoanDate]) [WTD],
+ COUNT([Race]) OVER (PARTITION BY [Race], DATEPART(MONTH, [LoanDate]) ORDER BY [LoanDate]) [MTD],
+ COUNT([Race]) OVER (PARTITION BY [Race], DATEPART(YEAR,  [LoanDate]) ORDER BY [LoanDate]) [YTD]
+
+FROM [dbo].[Mortgage Applicant]
+GROUP BY [Race], LoanDate
+
+
+--Loans To Date By Sex 
+
+SELECT COUNT (*)[Loan_Cnt], [Sex] , 
+ COUNT([Sex]) OVER (PARTITION BY [Sex] , DATEPART(WEEK,  [LoanDate]) ORDER BY [LoanDate]) [WTD],
+ COUNT([Sex]) OVER (PARTITION BY [Sex], DATEPART(MONTH, [LoanDate]) ORDER BY [LoanDate]) [MTD],
+ COUNT([Sex]) OVER (PARTITION BY [Sex], DATEPART(YEAR,  [LoanDate]) ORDER BY [LoanDate]) [YTD]
+
+FROM [dbo].[Mortgage Applicant]
+GROUP BY [Sex], LoanDate
+
+
+USE TMG_ODS
+GO
+
+SELECT * FROM [dbo].[Mortgage Applicant]
+
+SELECT [LoanDate] , AVG([LoanAmount])[Average_Loan],[LoanAmount],
+COUNT([LoanAmount]) OVER (PARTITION BY [LoanAmount], DATEPART(MONTH, [LoanDate]) ORDER BY [LoanDate]) [MTD]
+FROM [dbo].[Mortgage Applicant]
+WHERE [LoanDate] BETWEEN '2019-01-01' AND '2019-06-30'
+GROUP BY[LoanDate] ,[LoanAmount]
+
+CREATE VIEW VW_Last_Month_vs_Prior_6_Month_Avg
+AS (
+SELECT [LoanDate], AVG([LoanAmount])[Average_Loan],[LoanAmount],
+(CASE 
+  WHEN ([LoanDate]) BETWEEN '2019-01-01' AND '2019-06-30' THEN 'Prior_6_Mos'
+  WHEN ([LoanDate]) BETWEEN '2019-12-01' AND '2019-12-31' THEN 'Last Month'
+  ELSE 'Others' END)[year_Range]
+FROM [dbo].[Mortgage Applicant]
+
+GROUP BY CASE 
+  WHEN ([LoanDate]) BETWEEN '2019-01-01' AND '2019-06-30' THEN 'Prior_6_Mos'
+  WHEN ([LoanDate]) BETWEEN '2019-12-01' AND '2019-12-31' THEN 'Last Month'
+  ELSE 'Others' END, [LoanDate] ,[LoanAmount]
+ 
+  )
+  CREATE TABLE T1 
+  (
+LoanDate DATE,
+Average_Loan INT,
+LoanAmount INT,
+year_Range VARCHAR(11)
+  )
+  
+  CREATE TABLE T2
+  (
+LoanDate DATE,
+Average_Loan1 INT,
+LoanAmount1 INT,
+year_Range1 VARCHAR(11)
+  )
+  
+ INSERT INTO [dbo].[T1]
+SELECT * FROM [dbo].[VW_Last_Month_vs_Prior_6_Month_Avg]
+WHERE [year_Range] = 'Last Month'
+
+ INSERT INTO [dbo].[T2]
+SELECT * FROM [dbo].[VW_Last_Month_vs_Prior_6_Month_Avg]
+WHERE [year_Range] = 'Prior_6_Mos'
+
+SELECT COUNT([year_Range])[Last Month], COUNT([year_Range1])[Prior_6_Mos] FROM T1
+FULL OUTER JOIN T2
+ON T1.LoanDate = T2.LoanDate
+
+
+
+SELECT [LoanDate], COUNT ([LoanDate]) OVER (PARTITION BY DATEPART(QUARTER, [LoanDate]) ORDER BY [LoanDate]) [QTD] 
+FROM [dbo].[Mortgage Applicant]
+  
+SELECT DATEPART(QUARTER,[LoanDate]) FROM [dbo].[Mortgage Applicant]
+
+ALTER TABLE [dbo].[Mortgage Applicant]
+ADD [QUARTER_No] INT
+
+SELECT * FROM [dbo].[Mortgage Applicant]
+
+UPDATE [dbo].[Mortgage Applicant]
+SET [QUARTER_No] = 1
+WHERE  DATEPART(QUARTER,[LoanDate]) = 1
+
+UPDATE [dbo].[Mortgage Applicant]
+SET [QUARTER_No] = 2
+WHERE  DATEPART(QUARTER,[LoanDate]) = 2
+
+UPDATE [dbo].[Mortgage Applicant]
+SET [QUARTER_No] = 3
+WHERE  DATEPART(QUARTER,[LoanDate]) = 3
+
+UPDATE [dbo].[Mortgage Applicant]
+SET [QUARTER_No] = 4
+WHERE  DATEPART(QUARTER,[LoanDate]) = 4
+
+
+SELECT COUNT([QUARTER_No])[Quarter_Count], 
+COUNT ([LoanDate]) OVER (PARTITION BY DATEPART(QUARTER, [LoanDate]) ORDER BY [LoanDate]) [QTD] FROM [dbo].[Mortgage Applicant]
+WHERE [QUARTER_No] = 4
+GROUP BY [QUARTER_No],[LoanDate]
+
+
+CREATE TABLE Avg_Loan_Monthly_Income_by_Month
+(
+LoanDate DATE,
+MonthlyIncome INT,
+LoanAmount INT,
+)
+ 
+
+ INSERT INTO [dbo].[Avg_Loan_Monthly_Income_by_Month]
+ SELECT [LoanDate],[MonthlyIncome],[LoanAmount] FROM [dbo].[Mortgage Applicant]
+
+
+
+ SELECT * FROM [dbo].[Avg_Loan_Monthly_Income_by_Month]
+
+ --Avg Loan - % Monthly Income by Month 
+SELECT AVG([LoanAmount])[Avg Loan],
+(([MonthlyIncome]*100)/(SELECT SUM([MonthlyIncome])FROM[dbo].[Avg_Loan_Monthly_Income_by_Month]))[Percentage],
+DATEPART(MONTH,[LoanDate])[Month] FROM [dbo].[Avg_Loan_Monthly_Income_by_Month]
+GROUP BY [MonthlyIncome],[LoanDate]
+
+
+
+
+SELECT COUNT([LoanAmount])[Loan_Cnt], 
+DATEPART(MONTH,[LoanDate])[MonthNo] FROM [dbo].[Mortgage Applicant]
+GROUP BY DATEPART(MONTH,[LoanDate]),[LoanAmount]
+ORDER BY DATEPART(MONTH,[LoanDate])
+
+
+SELECT COUNT([LoanAmount])[Loan_Cnt], 
+DATEPART(QUARTER,[LoanDate])[QuarterNo] FROM [dbo].[Mortgage Applicant]
+GROUP BY DATEPART(QUARTER,[LoanDate]),[LoanAmount]
+ORDER BY DATEPART(QUARTER,[LoanDate])
+
+CREATE TABLE Report_Functionality 
+(
+[LoanDate] DATE ,
+[Borrower FirstName] VARCHAR(50),
+[Borrower LastName] VARCHAR(50),
+[Loan_ID] VARCHAR (50),
+[LoanAmount] INT,
+[Purchase Price] INT,
+[MonthlyIncome] VARCHAR(50)
+)
+
+INSERT INTO [dbo].[Report_Functionality]
+SELECT [LoanDate], [Borrower FirstName], [Borrower LastName],[Loan_ID],
+[LoanAmount],[Purchase Price],[MonthlyIncome] FROM [dbo].[Mortgage Applicant]
+
+SELECT * FROM [dbo].[Report_Functionality]
+
+SELECT 
+
+  COUNT([LoanAmount]) OVER (PARTITION BY [LoanAmount], DATEPART(WEEK,  [LoanDate]) ORDER BY [LoanDate]) [Week_To_Date],
+  COUNT([LoanAmount]) OVER (PARTITION BY [LoanAmount], DATEPART(MONTH, [LoanDate]) ORDER BY [LoanDate]) [Month_To_Date],
+  COUNT([LoanAmount]) OVER (PARTITION BY [LoanAmount], DATEPART(YEAR, [LoanDate]) ORDER BY [LoanDate]) [Year_To_Date]
+ 
+ FROM [dbo].[Report_Functionality]
+
+GROUP BY   DATEPART(WEEK,  [LoanDate]),[LoanAmount],[LoanDate]
+   ORDER BY [LoanDate]
+   SELECT
+ CONCAT (DATEPART(MONTH,[LoanDate]),',', DATEPART(YEAR,[LoanDate]))[Report_Month],
+ CONCAT ([Borrower FirstName], ' ',[Borrower LastName], ' ', [Loan_ID])[Name(LoanID)],
+ [LoanAmount], [Purchase Price], [MonthlyIncome] FROM [dbo].[Report_Functionality]
+ 
+ 
+ 
