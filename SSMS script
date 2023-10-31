@@ -434,4 +434,43 @@ GROUP BY   DATEPART(WEEK,  [LoanDate]),[LoanAmount],[LoanDate]
  [LoanAmount], [Purchase Price], [MonthlyIncome] FROM [dbo].[Report_Functionality]
  
  
+
+use Staging
+go 
+
+select * from Dim_Date
+select * from [dbo].[Fact_Loan]
+
+use TMG_ODS
+go 
+
+select * from [dbo].[Mortgage Applicant]
+
+
+
+
+CREATE VIEW VW_LOAN_TO_DATE
+AS(
+
+SELECT [LoanAmount], [LoanDate],
+ SUM([LoanAmount]) OVER (PARTITION BY [LoanAmount], DATEPART(WEEK,  [LoanDate]) ORDER BY [LoanDate]) [WTD],
+ SUM([LoanAmount]) OVER (PARTITION BY [LoanAmount], DATEPART(MONTH, [LoanDate]) ORDER BY [LoanDate]) [MTD],
+ SUM([LoanAmount]) OVER (PARTITION BY [LoanAmount], DATEPART(YEAR,  [LoanDate]) ORDER BY [LoanDate]) [YTD]
+
+FROM [dbo].[Mortgage Applicant]
+GROUP BY [LoanAmount], [LoanDate])
+
+CREATE VIEW VW_Loan_TO_Date_by_Purpose_Loan
+AS (
+SELECT [Purpose of Loan], [LoanAmount], [LoanDate],  
+ SUM([LoanAmount]) OVER (PARTITION BY [Purpose of Loan] , DATEPART(WEEK,  [LoanDate]) ORDER BY [LoanDate]) [WTD],
+ SUM([LoanAmount]) OVER (PARTITION BY [Purpose of Loan], DATEPART(MONTH, [LoanDate]) ORDER BY [LoanDate]) [MTD],
+ SUM([LoanAmount]) OVER (PARTITION BY [Purpose of Loan], DATEPART(YEAR,  [LoanDate]) ORDER BY [LoanDate]) [YTD]
+
+FROM [dbo].[Mortgage Applicant]
+
+)
+
+
+
  
